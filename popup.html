@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Gmail OTP Filler</title>
+  <link rel="stylesheet" href="popup.css" />
+</head>
+<body>
+  <div class="container">
+    <!-- Empty state: no accounts added yet -->
+    <section id="empty-section">
+      <header><h1>Gmail OTP Filler</h1></header>
+      <p class="hint">Add a Gmail account to get started.</p>
+      <button id="add-first-btn" class="btn primary">+ Add Gmail Account</button>
+    </section>
+
+    <!-- Main section (shown when at least one account exists) -->
+    <section id="main-section" hidden>
+      <header class="main-header">
+        <h1>Gmail OTP Filler</h1>
+        <div class="header-actions">
+          <button id="add-btn" class="add-btn" title="Add another Gmail account">+</button>
+          <button id="fetch-btn" class="refresh-btn" title="Refresh codes">&#x21BB;</button>
+        </div>
+      </header>
+
+      <!-- Account filter chips -->
+      <div id="account-chips" class="account-chips"></div>
+
+      <div id="status" class="status"></div>
+
+      <div id="codes-list" class="codes-list"></div>
+
+      <button id="fill-btn" class="btn primary" disabled>Fill &amp; Submit</button>
+
+      <button id="manage-btn" class="btn ghost">Manage accounts</button>
+    </section>
+
+    <!-- Manage accounts panel -->
+    <section id="manage-section" hidden>
+      <header class="main-header">
+        <h1>Accounts</h1>
+        <button id="manage-back-btn" class="refresh-btn" title="Back">&#x2190;</button>
+      </header>
+      <div id="accounts-list" class="accounts-list"></div>
+      <button id="manage-add-btn" class="btn primary">+ Add Gmail Account</button>
+    </section>
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>
