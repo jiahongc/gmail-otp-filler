@@ -24,7 +24,7 @@ git clone https://github.com/YOUR_USERNAME/gmail-otp-filler.git
 1. Open Chrome and go to `chrome://extensions`
 2. Enable **Developer mode** (top-right toggle)
 3. Click **Load unpacked** and select the cloned folder
-4. Note the **Extension ID** shown on the card (e.g. `ekoachgmihlhglpbmokocmceijejnmge`)
+4. Note the **Extension ID** shown on the card (e.g. `abcdefghijklmnopqrstuvwxyzabcdef`)
 
 ### 3. Set up Google Cloud OAuth
 
