@@ -10,10 +10,14 @@ function getClientId() {
 
 // OTP regex patterns — keyword-anchored only
 const OTP_PATTERNS = [
+  // keyword BEFORE code (e.g. "Your code is 761283")
   /(?:code|otp|passcode|token|verify|verification)[^A-Za-z0-9]{0,5}([A-Z0-9]{4,10})\b/g,
   /(?:code|otp|passcode|token|verify|verification)[^\d]{0,5}(\d{4,8})\b/gi,
+  // "is <code>" (e.g. "Your code is 761283")
   /\bis\s+([A-Z0-9]{4,10})\b/g,
   /\bis\s+(\d{4,8})\b/gi,
+  // code BEFORE keyword within 80 chars (e.g. "761283\nPlease enter the above one-time password")
+  /\b(\d{4,8})\b(?=[^\d]{0,80}(?:password|one.?time|passcode|otp|\bcode\b|verify))/gi,
 ];
 
 // ── Account storage ───────────────────────────────────────────────────────────
