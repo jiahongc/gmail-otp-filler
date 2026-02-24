@@ -9,22 +9,24 @@ function getClientId() {
 }
 
 // OTP regex patterns — keyword-anchored only
-// Hyphenated/spaced codes (e.g. "123-456", "ABC-123") are captured with the separator
+// Hyphenated codes (e.g. "123-456", "ABC-123") are captured with the hyphen
 // and stripped in extractOTP before returning.
+// Space is NOT used as a separator — too ambiguous in natural language sentences.
 const OTP_PATTERNS = [
   // keyword BEFORE contiguous code (e.g. "Your code: 761283", "PIN: 1234", "password: ABC123")
   /(?:code|otp|passcode|password|token|verify|verification|\bpin\b|2fa|two.?factor)[^A-Za-z0-9]{0,5}([A-Z0-9]{4,10})\b/g,
   /(?:code|otp|passcode|password|token|verify|verification|\bpin\b|2fa|two.?factor)[^\d]{0,5}(\d{4,8})\b/gi,
-  // keyword BEFORE hyphenated/spaced code (e.g. "code: 123-ABC", "PIN: 761 283")
-  /(?:code|otp|passcode|password|token|verify|verification|\bpin\b|2fa|two.?factor)[^A-Za-z0-9]{0,5}([A-Z0-9]{2,6}[-\s][A-Z0-9]{2,6})\b/gi,
+  // keyword BEFORE hyphenated code (e.g. "code: 123-ABC", "PIN: 761-283")
+  /(?:code|otp|passcode|password|token|verify|verification|\bpin\b|2fa|two.?factor)[^A-Za-z0-9]{0,5}([A-Z0-9]{2,6}-[A-Z0-9]{2,6})\b/gi,
   // "is <code>" — contiguous or hyphenated (e.g. "Your code is 761283", "code is 123-ABC")
   /\bis\s+([A-Z0-9]{4,10})\b/g,
   /\bis\s+(\d{4,8})\b/gi,
-  /\bis\s+([A-Z0-9]{2,6}[-\s][A-Z0-9]{2,6})\b/gi,
+  /\bis\s+([A-Z0-9]{2,6}-[A-Z0-9]{2,6})\b/gi,
   // code BEFORE keyword within 80 chars (e.g. "761283\nPlease enter the above one-time password")
   /\b(\d{4,8})\b(?=[^\d]{0,80}(?:password|one.?time|passcode|otp|\bcode\b|verify|2fa|two.?factor|\bpin\b))/gi,
   /\b([A-Z0-9]{4,10})\b(?=[^A-Z0-9]{0,80}(?:one.?time|passcode|otp|\bcode\b|verify|2fa|two.?factor|\bpin\b))/g,
-  /\b([A-Z0-9]{2,6}[-\s][A-Z0-9]{2,6})\b(?=[^A-Z0-9]{0,80}(?:password|one.?time|passcode|otp|\bcode\b|verify|2fa|\bpin\b))/gi,
+  // hyphenated code BEFORE keyword (e.g. "123-ABC — please use this one-time code")
+  /\b([A-Z0-9]{2,6}-[A-Z0-9]{2,6})\b(?=[^A-Z0-9]{0,80}(?:password|one.?time|passcode|otp|\bcode\b|verify|2fa|\bpin\b))/gi,
 ];
 
 // ── Account storage ───────────────────────────────────────────────────────────
