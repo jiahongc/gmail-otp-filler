@@ -9,16 +9,22 @@ function getClientId() {
 }
 
 // OTP regex patterns — keyword-anchored only
+// Hyphenated/spaced codes (e.g. "123-456", "ABC-123") are captured with the separator
+// and stripped in extractOTP before returning.
 const OTP_PATTERNS = [
-  // keyword BEFORE code (e.g. "Your code: 761283", "PIN: 1234", "temporary password: ABC123")
+  // keyword BEFORE contiguous code (e.g. "Your code: 761283", "PIN: 1234", "password: ABC123")
   /(?:code|otp|passcode|password|token|verify|verification|\bpin\b|2fa|two.?factor)[^A-Za-z0-9]{0,5}([A-Z0-9]{4,10})\b/g,
   /(?:code|otp|passcode|password|token|verify|verification|\bpin\b|2fa|two.?factor)[^\d]{0,5}(\d{4,8})\b/gi,
-  // "is <code>" (e.g. "Your code is 761283")
+  // keyword BEFORE hyphenated/spaced code (e.g. "code: 123-ABC", "PIN: 761 283")
+  /(?:code|otp|passcode|password|token|verify|verification|\bpin\b|2fa|two.?factor)[^A-Za-z0-9]{0,5}([A-Z0-9]{2,6}[-\s][A-Z0-9]{2,6})\b/gi,
+  // "is <code>" — contiguous or hyphenated (e.g. "Your code is 761283", "code is 123-ABC")
   /\bis\s+([A-Z0-9]{4,10})\b/g,
   /\bis\s+(\d{4,8})\b/gi,
+  /\bis\s+([A-Z0-9]{2,6}[-\s][A-Z0-9]{2,6})\b/gi,
   // code BEFORE keyword within 80 chars (e.g. "761283\nPlease enter the above one-time password")
   /\b(\d{4,8})\b(?=[^\d]{0,80}(?:password|one.?time|passcode|otp|\bcode\b|verify|2fa|two.?factor|\bpin\b))/gi,
   /\b([A-Z0-9]{4,10})\b(?=[^A-Z0-9]{0,80}(?:one.?time|passcode|otp|\bcode\b|verify|2fa|two.?factor|\bpin\b))/g,
+  /\b([A-Z0-9]{2,6}[-\s][A-Z0-9]{2,6})\b(?=[^A-Z0-9]{0,80}(?:password|one.?time|passcode|otp|\bcode\b|verify|2fa|\bpin\b))/gi,
 ];
 
 // ── Account storage ───────────────────────────────────────────────────────────
@@ -159,8 +165,9 @@ function extractOTP(text) {
   for (const pattern of OTP_PATTERNS) {
     const matches = [...text.matchAll(pattern)];
     if (matches.length > 0) {
-      const sixChar = matches.find((m) => m[1]?.length === 6);
-      return sixChar ? sixChar[1] : matches[0][1];
+      const cleaned = matches.map((m) => m[1]?.replace(/[-\s]/g, ""));
+      const sixChar = cleaned.find((c) => c?.length === 6);
+      return sixChar ?? cleaned[0];
     }
   }
   return null;
