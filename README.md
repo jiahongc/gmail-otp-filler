@@ -105,7 +105,7 @@ After filling the code, the extension looks for nearby submit/verify/confirm but
 |------------|-----|
 | `identity` | OAuth sign-in via `launchWebAuthFlow` |
 | `gmail.readonly` | Read emails to extract verification codes |
-| `storage` | Store account tokens locally |
+| `storage` | Persist the account list (emails only); access tokens stay in memory-only session storage |
 | `activeTab` + `scripting` | Inject content script and fill OTP fields in the current tab (on-demand only) |
 
 The extension **never sends** your emails or tokens to any external server. All processing happens locally.
@@ -114,7 +114,7 @@ The extension **never sends** your emails or tokens to any external server. All 
 
 - **Local-only processing** — All email fetching, OTP extraction, and form filling happens entirely on your device. No data is sent to any external server.
 - **Minimal permissions** — The extension requests only `gmail.readonly` (no send/modify access) and injects content scripts on-demand, not on every page.
-- **Short-lived tokens** — OAuth2 access tokens expire after 1 hour and are refreshed silently. Tokens are stored in Chrome's extension-isolated `chrome.storage.local`, which is encrypted at rest by the OS on macOS (Keychain), Windows (DPAPI), and ChromeOS.
+- **Short-lived tokens, never on disk** — OAuth2 access tokens expire after 1 hour and are refreshed silently. Tokens are held only in `chrome.storage.session` (in-memory, cleared when the browser exits) and are revoked when you remove an account. Only account emails are persisted to `chrome.storage.local`.
 - **Extension isolation** — Chrome enforces strict storage isolation between extensions. No other extension or webpage can access your stored tokens.
 - **No background activity** — The extension only scans Gmail when you open the popup. There is no persistent background polling or data collection.
 - **Open source** — All code is in this repo. There is no minified or obfuscated code.

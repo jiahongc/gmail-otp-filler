@@ -124,6 +124,39 @@ test("extracts Microsoft security code", () => {
   );
 });
 
+test("extracts a standalone code when the keyword is a sentence away (SeatGeek)", () => {
+  // The code sits alone in a styled box; nearest keyword "code" is a sentence
+  // back, separated by the digit run "10 minutes".
+  const body =
+    "[SeatGeek] Sign into your account Your verification code Hey there, " +
+    "Here's the log in code you requested to access your SeatGeek account. " +
+    "The code will expire in 10 minutes. 260961 2026 SeatGeek, Inc.";
+  assert.equal(extractOTP(body), "260961");
+});
+
+test("does not extract a postal ZIP code from an email footer", () => {
+  // Google account-access notification: footer link text ("sign-in & security")
+  // follows the Mountain View ZIP, which the proximity pattern would otherwise grab.
+  const body =
+    "You allowed OTP Filler access to your Google Account. See security activity. " +
+    "2026 Google LLC, 1600 Amphitheatre Parkway, Mountain View, CA 94043, USA. " +
+    "Manage your sign-in and security settings.";
+  assert.equal(extractOTP(body), null);
+});
+
+test("does not extract a street number or copyright year from a footer", () => {
+  // street number followed by a keyword within range
+  assert.equal(
+    extractOTP("Need help? 1600 Amphitheatre Parkway — manage your login and security."),
+    null
+  );
+  // copyright year followed by a keyword within range
+  assert.equal(
+    extractOTP("Thanks. © 2026 Example, Inc. Sign in to verify your account."),
+    null
+  );
+});
+
 test("prefilter accepts confirmation/sign-in/login/security keywords", () => {
   assert.equal(looksLikeOTPEmail("Your confirmation code", "", ""), true);
   assert.equal(looksLikeOTPEmail("Sign-in code", "", ""), true);

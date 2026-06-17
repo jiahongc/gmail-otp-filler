@@ -15,6 +15,10 @@ function getClientId() {
 // Shared keyword group used across patterns
 const KW = "code|otp|passcode|password|token|verify|verification|\\bpin\\b|2fa|two.?factor|confirmation|sign.?in|login|security|activation";
 const KW_PREFILTER = "password|one.?time|passcode|otp|\\bcode\\b|verify|2fa|two.?factor|\\bpin\\b|confirmation|sign.?in|login|security";
+// Strong, unambiguous code words — used for the wider-gap pattern below where a
+// keyword can sit a full sentence away from the code, so the keyword set must be
+// specific enough not to drag in random numbers.
+const KW_STRONG = "verification|passcode|one.?time|\\botp\\b|2fa|two.?factor|security.?code|login.?code|access.?code|\\bcode\\b";
 
 const OTP_PATTERNS = [
   // keyword BEFORE contiguous code (e.g. "Your code: 761283", "PIN: 1234", "password: ABC123")
@@ -34,6 +38,11 @@ const OTP_PATTERNS = [
   new RegExp(`\\b([A-Z0-9]{2,6}-[A-Z0-9]{2,6})\\b(?=[^A-Z0-9]{0,80}(?:${KW_PREFILTER}))`, "gi"),
   // keyword → wider gap → colon/equals → code (e.g. "password. Use it to log in: 973230")
   new RegExp(`(?:${KW}).{1,50}[:=]\\s*([A-Za-z0-9]{4,10})\\b`, "gi"),
+  // strong keyword earlier in the sentence, code stands alone within ~40 chars
+  // (e.g. "The code will expire in 10 minutes. 260961"). The lazy gap may cross
+  // non-code digit runs like "10 minutes" without capturing them, since the
+  // capture group still requires a contiguous 4-8 digit number.
+  new RegExp(`(?:${KW_STRONG})[^\\n]{0,40}?\\b(\\d{4,8})\\b`, "gi"),
   // Single-letter prefixed codes — capture digits only (e.g. Google "G-412157" → "412157")
   /\b[A-Z]-(\d{4,8})\b/gi,
 ];
@@ -62,14 +71,42 @@ const OTP_STOPWORDS = new Set([
 ]);
 
 // ── Account storage ───────────────────────────────────────────────────────────
+// chrome.storage.local holds only account metadata ({email, name}).
+// Access tokens live in chrome.storage.session (memory-only, never written to
+// disk, cleared when the browser exits) under one key per email — per-key
+// writes avoid read-modify-write races between concurrent silent refreshes.
+// After a browser restart, tokens are rebuilt via silent re-auth (prompt=none).
 
 async function getAccounts() {
   const { accounts } = await chrome.storage.local.get("accounts");
-  return accounts || [];
+  if (!accounts) return [];
+  // Migrate pre-session-storage entries that persisted tokens to disk
+  if (accounts.some((a) => a.accessToken)) {
+    const stripped = accounts.map(({ email, name }) => ({ email, name }));
+    await saveAccounts(stripped);
+    return stripped;
+  }
+  return accounts;
 }
 
 async function saveAccounts(accounts) {
-  await chrome.storage.local.set({ accounts });
+  await chrome.storage.local.set({
+    accounts: accounts.map(({ email, name }) => ({ email, name })),
+  });
+}
+
+async function getToken(email) {
+  const key = `token:${email}`;
+  const stored = await chrome.storage.session.get(key);
+  return stored[key] || null;
+}
+
+async function saveToken(email, token) {
+  await chrome.storage.session.set({ [`token:${email}`]: token });
+}
+
+async function removeToken(email) {
+  await chrome.storage.session.remove(`token:${email}`);
 }
 
 // ── Auth via launchWebAuthFlow ────────────────────────────────────────────────
@@ -115,9 +152,9 @@ async function addAccount() {
   const account = {
     email: info.email,
     name: info.name || info.email,
-    accessToken,
-    expiresAt,
   };
+
+  await saveToken(account.email, { accessToken, expiresAt });
 
   const accounts = await getAccounts();
   const idx = accounts.findIndex((a) => a.email === account.email);
@@ -129,26 +166,37 @@ async function addAccount() {
 }
 
 async function removeAccount(email) {
+  // Best-effort revoke so the token dies now instead of at natural expiry
+  const stored = await getToken(email);
+  if (stored?.accessToken) {
+    try {
+      await fetch("https://oauth2.googleapis.com/revoke", {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: `token=${encodeURIComponent(stored.accessToken)}`,
+      });
+    } catch {
+      // Token still expires on its own within the hour
+    }
+  }
+  await removeToken(email);
   const accounts = await getAccounts();
   await saveAccounts(accounts.filter((a) => a.email !== email));
 }
 
 async function getValidToken(account) {
   // Token still fresh (with 60s buffer)
-  if (account.expiresAt > Date.now() + 60000) return account.accessToken;
+  const stored = await getToken(account.email);
+  if (stored && stored.expiresAt > Date.now() + 60000) return stored.accessToken;
 
   // Try silent refresh
   try {
-    const { accessToken, expiresAt } = await launchAuth(
+    const fresh = await launchAuth(
       buildAuthUrl({ prompt: "none", loginHint: account.email }),
       false // non-interactive
     );
-    account.accessToken = accessToken;
-    account.expiresAt = expiresAt;
-    const accounts = await getAccounts();
-    const idx = accounts.findIndex((a) => a.email === account.email);
-    if (idx >= 0) { accounts[idx] = account; await saveAccounts(accounts); }
-    return accessToken;
+    await saveToken(account.email, fresh);
+    return fresh.accessToken;
   } catch {
     throw new Error(`Token expired for ${account.email}. Please re-add the account.`);
   }
@@ -235,6 +283,29 @@ function scoreOTPCandidate(candidate, patternIndex, matchIndex) {
   return score;
 }
 
+// Reject numbers that are really postal codes, street numbers, or copyright
+// years sitting in an email footer (e.g. "Mountain View, CA 94043, USA").
+// Keyword-proximity patterns otherwise grab these because legal/footer text is
+// full of words like "security", "sign-in", and "account".
+function looksLikeJunkNumberContext(before, candidate, after) {
+  // Postal code: "<City>, ST 94043, USA"
+  if (/[A-Za-z]{2}[.,]?\s*$/.test(before) && /^\s*,?\s*(?:USA|US|United States|U\.S\.A?\.?)\b/i.test(after)) {
+    return true;
+  }
+  // Street number: "1600 Amphitheatre Parkway"
+  if (/^\s+(?:[NSEW]\.?\s+)?[A-Za-z]+\s+(?:Street|St|Avenue|Ave|Parkway|Pkwy|Boulevard|Blvd|Road|Rd|Drive|Dr|Lane|Ln|Circle|Cir|Court|Ct|Way|Place|Pl|Square|Sq|Terrace|Ter|Highway|Hwy|Suite|Ste|Floor|Fl|Building|Bldg)\b/i.test(after)) {
+    return true;
+  }
+  // Copyright year: "© 2026 Example, Inc." / "© 2026 ... All rights reserved"
+  if (/^(?:19|20)\d{2}$/.test(candidate) &&
+      (/(?:©|\(c\)|copyright)\s*$/i.test(before) ||
+       /^\s+[A-Z][\w.&' -]*\b(?:Inc|LLC|Ltd|Corp|GmbH|Co|Company)\b/.test(after) ||
+       /^[\s,]*all rights reserved/i.test(after))) {
+    return true;
+  }
+  return false;
+}
+
 function extractOTP(text) {
   // Strip zero-width / invisible Unicode chars that emails inject between digits
   // to poison scrapers (e.g. 0͏5͏6͏9͏3͏0 renders as "056930" but breaks \d+ regex).
@@ -257,6 +328,15 @@ function extractOTP(text) {
       const candidate = normalizeOTP(match[1]);
       const score = scoreOTPCandidate(candidate, patternIndex, match.index ?? Number.MAX_SAFE_INTEGER);
       if (score < 0) continue;
+
+      // Locate the captured code within the match (it's at the end for keyword-
+      // before patterns, and the whole match for code-before-keyword lookaheads)
+      // and reject it if the surrounding text is an address/footer context.
+      const raw = match[1] ?? "";
+      const codeStart = (match.index ?? 0) + match[0].lastIndexOf(raw);
+      const before = text.slice(Math.max(0, codeStart - 25), codeStart);
+      const after = text.slice(codeStart + raw.length, codeStart + raw.length + 25);
+      if (looksLikeJunkNumberContext(before, candidate, after)) continue;
 
       if (!best || score > best.score) {
         best = { candidate, score };
@@ -290,7 +370,7 @@ async function fetchOTPsForAccount(token, accountEmail) {
   const data = await gmailFetch(`/users/me/messages?maxResults=${MAX_EMAILS_TO_SCAN}&q=${encodeURIComponent(q)}`, token);
   const messages = data.messages || [];
 
-  const results = await Promise.all(
+  const settled = await Promise.allSettled(
     messages.map(async ({ id }) => {
       const msg = await gmailFetch(`/users/me/messages/${id}?format=full`, token);
       const subject = msg.payload.headers?.find((h) => h.name === "Subject")?.value || "";
@@ -313,7 +393,10 @@ async function fetchOTPsForAccount(token, accountEmail) {
     })
   );
 
-  return results.filter(Boolean);
+  // One unreadable message shouldn't sink the whole account's batch
+  return settled
+    .filter((s) => s.status === "fulfilled" && s.value)
+    .map((s) => s.value);
 }
 
 async function fetchAllOTPs(filterEmail = null) {
@@ -381,6 +464,8 @@ if (typeof chrome !== "undefined" && chrome.runtime?.onMessage) {
         if (!tabs[0]) return sendResponse({ ok: false, error: "No active tab" });
         const tabId = tabs[0].id;
         try {
+          // content.js self-guards against double-load (see its IIFE), so a
+          // repeat injection on an already-injected page is a safe no-op.
           await chrome.scripting.executeScript({ target: { tabId }, files: ["content.js"] });
           chrome.tabs.sendMessage(tabId, { type: "FILL_OTP", code: msg.code }, (res) =>
             sendResponse(res || { ok: false, error: "No OTP field found on this page." })

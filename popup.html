@@ -10,29 +10,63 @@
   <div class="container">
     <!-- Empty state: no accounts added yet -->
     <section id="empty-section">
-      <header><h1>OTP Filler for Gmail</h1></header>
-      <p class="hint">Add a Gmail account to get started.</p>
+      <div class="empty-hero">
+        <div class="hero-tile">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M12 3l7 2.8v5.4c0 4.3-2.9 7.6-7 9.3-4.1-1.7-7-5-7-9.3V5.8L12 3z"/>
+            <circle cx="8.6" cy="11.5" r="0.9" fill="currentColor" stroke="none"/>
+            <circle cx="12" cy="11.5" r="0.9" fill="currentColor" stroke="none"/>
+            <circle cx="15.4" cy="11.5" r="0.9" fill="currentColor" stroke="none"/>
+          </svg>
+        </div>
+        <h1>OTP Filler</h1>
+        <p class="hint">Codes from your Gmail inbox,<br />filled into any form in one click.</p>
+      </div>
       <button id="add-first-btn" class="btn primary">+ Add Gmail Account</button>
+      <p class="footnote">Read-only access &middot; codes never leave your device</p>
     </section>
 
     <!-- Main section (shown when at least one account exists) -->
     <section id="main-section" hidden>
       <header class="main-header">
-        <h1>OTP Filler for Gmail</h1>
+        <div class="brand">
+          <div class="brand-tile">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M12 3l7 2.8v5.4c0 4.3-2.9 7.6-7 9.3-4.1-1.7-7-5-7-9.3V5.8L12 3z"/>
+              <circle cx="8.6" cy="11.5" r="0.9" fill="currentColor" stroke="none"/>
+              <circle cx="12" cy="11.5" r="0.9" fill="currentColor" stroke="none"/>
+              <circle cx="15.4" cy="11.5" r="0.9" fill="currentColor" stroke="none"/>
+            </svg>
+          </div>
+          <div class="brand-text">
+            <h1>OTP Filler</h1>
+            <span class="brand-sub">Gmail</span>
+          </div>
+        </div>
         <div class="header-actions">
           <button id="add-btn" class="add-btn" title="Add another Gmail account">+</button>
-          <button id="fetch-btn" class="refresh-btn" title="Refresh codes">&#x21BB;</button>
+          <button id="fetch-btn" class="refresh-btn" title="Refresh codes">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M21 12a9 9 0 1 1-2.6-6.3"/>
+              <path d="M21 3v6h-6"/>
+            </svg>
+          </button>
         </div>
       </header>
 
       <!-- Account filter chips -->
       <div id="account-chips" class="account-chips"></div>
 
-      <div id="status" class="status"></div>
+      <div id="status" class="status" role="status" aria-live="polite"></div>
 
       <div id="codes-list" class="codes-list"></div>
 
-      <button id="fill-btn" class="btn primary" disabled>Fill &amp; Submit</button>
+      <button id="fill-btn" class="btn primary" disabled>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M13 2L4.5 13.5h6L11 22l8.5-11.5h-6L13 2z"/>
+        </svg>
+        <span>Fill &amp; Submit</span>
+      </button>
 
       <button id="manage-btn" class="btn ghost">Manage accounts</button>
     </section>
@@ -40,8 +74,18 @@
     <!-- Manage accounts panel -->
     <section id="manage-section" hidden>
       <header class="main-header">
-        <h1>Accounts</h1>
-        <button id="manage-back-btn" class="refresh-btn" title="Back">&#x2190;</button>
+        <div class="brand">
+          <button id="manage-back-btn" class="refresh-btn" title="Back">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M19 12H5"/>
+              <path d="M12 19l-7-7 7-7"/>
+            </svg>
+          </button>
+          <div class="brand-text">
+            <h1>Accounts</h1>
+            <span class="brand-sub">Connected inboxes</span>
+          </div>
+        </div>
       </header>
       <div id="accounts-list" class="accounts-list"></div>
       <button id="manage-add-btn" class="btn primary">+ Add Gmail Account</button>
