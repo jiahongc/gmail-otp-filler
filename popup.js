@@ -162,16 +162,17 @@ function renderCodes(codes, accounts, shouldAutoCopy = false) {
 
     card.querySelector(".copy-btn").addEventListener("click", async (e) => {
       e.stopPropagation();
+      const btn = e.currentTarget;
       try {
         await navigator.clipboard.writeText(item.code);
-        const btn = e.currentTarget;
-        btn.textContent = "\u2713";
-        btn.classList.add("copied");
-        setStatus(`Copied ${item.code}`, "success");
-        setTimeout(() => { btn.innerHTML = "&#x29C9;"; btn.classList.remove("copied"); }, 1500);
       } catch {
         setStatus("Clipboard access denied.", "error");
+        return;
       }
+      btn.textContent = "\u2713";
+      btn.classList.add("copied");
+      setStatus(`Copied ${item.code}`, "success");
+      setTimeout(() => { btn.innerHTML = "&#x29C9;"; btn.classList.remove("copied"); }, 1500);
     });
 
     codesList.appendChild(card);
