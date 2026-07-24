@@ -31,6 +31,27 @@
     'input[type="text"][maxlength="4"]',
   ];
 
+  // Some services render the code box as a textarea or an accessible
+  // contenteditable field rather than an <input>. These require separate
+  // selectors because they do not match the native input selectors above.
+  const OTP_TEXTAREA_SELECTORS = [
+    'textarea[autocomplete="one-time-code"]',
+    'textarea[name*="otp" i]',
+    'textarea[name*="code" i]',
+    'textarea[name*="token" i]',
+    'textarea[name*="verify" i]',
+    'textarea[placeholder*="code" i]',
+    'textarea[placeholder*="otp" i]',
+    'textarea[placeholder*="verification" i]',
+  ];
+
+  const OTP_EDITABLE_SELECTORS = [
+    '[contenteditable="true"][aria-label*="code" i]',
+    '[contenteditable="true"][aria-label*="otp" i]',
+    '[contenteditable="true"][aria-label*="verification" i]',
+    '[contenteditable="true"][data-otp]',
+  ];
+
   // Detect split OTP inputs (one digit per field, e.g. 4-8 separate <input maxlength="1">)
   function findSplitOTPFields() {
     const singles = [...document.querySelectorAll(
@@ -66,20 +87,28 @@
     if (splitFields) return { type: "split", fields: splitFields, confidence: "high" };
 
     // Then check single-input selectors
-    for (const selector of OTP_SELECTORS) {
-      const el = document.querySelector(selector);
-      if (el && isVisible(el)) return { type: "single", field: el, confidence: "high" };
+    for (const selector of [...OTP_SELECTORS, ...OTP_TEXTAREA_SELECTORS]) {
+      const el = [...document.querySelectorAll(selector)].find(isEligibleField);
+      if (el) return { type: "single", field: el, confidence: "high" };
+    }
+
+    // Rich-text controls vary greatly between frameworks. Require explicit OTP
+    // metadata and keep their confidence low so a successful fill never clicks
+    // a nearby unrelated button automatically.
+    for (const selector of OTP_EDITABLE_SELECTORS) {
+      const el = [...document.querySelectorAll(selector)].find(isEligibleField);
+      if (el) return { type: "single", field: el, confidence: "low" };
     }
 
     // Fallback: heuristic search across all input types (including password, no type)
-    const inputs = [...document.querySelectorAll('input:not([type="hidden"]):not([type="checkbox"]):not([type="radio"]):not([type="submit"])')];
-    const match = inputs.find((input) => {
+    const fields = [...document.querySelectorAll('input:not([type="hidden"]):not([type="checkbox"]):not([type="radio"]):not([type="submit"]), textarea')];
+    const match = fields.find((input) => {
       const max = parseInt(input.maxLength, 10);
       // Accept maxlength 4-8, or inputs with no maxlength that have OTP-related context
       const hasReasonableLength = (max >= 4 && max <= 8) || max === -1 || max === 524288;
       if (!hasReasonableLength) return false;
       const label = getNearbyText(input).toLowerCase();
-      return /code|otp|verif|pin|passcode|token/.test(label) && isVisible(input);
+      return /code|otp|verif|pin|passcode|token/.test(label) && isEligibleField(input);
     });
     return match ? { type: "single", field: match, confidence: "low" } : null;
   }
@@ -94,6 +123,10 @@
       style.visibility !== "hidden" &&
       style.opacity !== "0"
     );
+  }
+
+  function isEligibleField(el) {
+    return isVisible(el) && !el.disabled && !el.readOnly && el.getAttribute("aria-disabled") !== "true";
   }
 
   function getNearbyText(input) {
@@ -112,21 +145,31 @@
 
   // ── Fill logic ────────────────────────────────────────────────────────────────
 
-  const nativeInputValueSetter = Object.getOwnPropertyDescriptor(
-    window.HTMLInputElement.prototype,
-    "value"
-  )?.set;
+  const nativeValueSetters = new Map([
+    [window.HTMLInputElement, Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value")?.set],
+    [window.HTMLTextAreaElement, Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype, "value")?.set],
+  ]);
+
+  function setNativeValue(field, value) {
+    for (const [ElementType, setter] of nativeValueSetters) {
+      if (ElementType && setter && field instanceof ElementType) {
+        setter.call(field, value);
+        return;
+      }
+    }
+    field.value = value;
+  }
 
   function simulateTyping(field, value) {
     field.focus();
     field.dispatchEvent(new Event("focus", { bubbles: true }));
     field.dispatchEvent(new Event("focusin", { bubbles: true }));
 
-    // Set value via native setter (required for React/Vue/Angular controlled inputs)
-    if (nativeInputValueSetter) {
-      nativeInputValueSetter.call(field, value);
+    // Set value via the native setter (required for React/Vue/Angular controlled fields).
+    if (field.isContentEditable) {
+      field.textContent = value;
     } else {
-      field.value = value;
+      setNativeValue(field, value);
     }
 
     // Dispatch comprehensive events — different frameworks listen to different ones

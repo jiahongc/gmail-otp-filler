@@ -1,6 +1,6 @@
 {
   "name": "gmail-otp-filler",
-  "version": "1.2.0",
+  "version": "1.2.1",
   "description": "Automatically extracts verification codes from Gmail and fills them into web forms.",
   "main": "background.js",
   "scripts": {
