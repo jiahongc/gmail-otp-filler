@@ -43,6 +43,10 @@ const OTP_PATTERNS = [
   // non-code digit runs like "10 minutes" without capturing them, since the
   // capture group still requires a contiguous 4-8 digit number.
   new RegExp(`(?:${KW_STRONG})[^\\n]{0,40}?\\b(\\d{4,8})\\b`, "gi"),
+  // Some senders put explanatory copy between a passcode label and the code
+  // (e.g. Disney's "Use this passcode to verify ... It will expire ... 123456").
+  // Keep this broader window limited to the explicit "passcode" term.
+  /\bpasscode\b[^\n]{0,120}?\b(\d{4,8})\b/gi,
   // Single-letter prefixed codes — capture digits only (e.g. Google "G-412157" → "412157")
   /\b[A-Z]-(\d{4,8})\b/gi,
 ];

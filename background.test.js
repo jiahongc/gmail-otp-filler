@@ -134,6 +134,13 @@ test("extracts a standalone code when the keyword is a sentence away (SeatGeek)"
   assert.equal(extractOTP(body), "260961");
 });
 
+test("extracts a passcode after Disney's explanatory copy", () => {
+  const body =
+    "Use this passcode to verify the email address associated with your account. " +
+    "It will expire in 15 minutes. 123456 If you did not make this request, ignore this email.";
+  assert.equal(extractOTP(body), "123456");
+});
+
 test("does not extract a postal ZIP code from an email footer", () => {
   // Google account-access notification: footer link text ("sign-in & security")
   // follows the Mountain View ZIP, which the proximity pattern would otherwise grab.
