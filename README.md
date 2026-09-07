@@ -2,6 +2,8 @@
 
 Chrome extension that automatically extracts verification codes from your Gmail and fills them into web forms with one click.
 
+[Setup](#setup) · [Usage](#usage) · [Permissions](#permissions) · [Development](#development)
+
 ## Features
 
 - **Multi-account** — Add multiple Gmail accounts and switch between them
@@ -18,6 +20,8 @@ Chrome extension that automatically extracts verification codes from your Gmail 
 
 ```bash
 git clone https://github.com/jiahongc/otp-filler-for-gmail-extension.git
+cd otp-filler-for-gmail-extension
+cp manifest.example.json manifest.json
 ```
 
 ### 2. Load the extension
@@ -45,13 +49,7 @@ git clone https://github.com/jiahongc/otp-filler-for-gmail-extension.git
 
 ### 4. Add your Client ID
 
-Copy the example manifest and add your client ID:
-
-```bash
-cp manifest.example.json manifest.json
-```
-
-Then open `manifest.json` and replace the `client_id` value:
+Open the `manifest.json` created in step 1 and replace its placeholder `client_id` value:
 
 ```json
 "oauth2": {
@@ -108,22 +106,30 @@ After filling the code, the extension looks for nearby submit/verify/confirm but
 | `storage` | Persist the account list (emails only); access tokens stay in memory-only session storage |
 | `activeTab` + `scripting` | Inject content script and fill OTP fields in the current tab (on-demand only) |
 
-The extension **never sends** your emails or tokens to any external server. All processing happens locally.
+The extension talks directly to Google for OAuth and Gmail access. OTP extraction runs in the extension; **Fill & Submit** sends the selected code to the active website through its form. There is no application backend for email processing.
 
 ## Security & Privacy
 
-- **Local-only processing** — All email fetching, OTP extraction, and form filling happens entirely on your device. No data is sent to any external server.
+- **Data flow** — Google supplies email content through the Gmail API. The extension extracts codes locally and fills them into a website only when you choose **Fill & Submit**. That action also attempts to submit the form.
 - **Minimal permissions** — The extension requests only `gmail.readonly` (no send/modify access) and injects content scripts on-demand, not on every page.
 - **Short-lived tokens, never on disk** — OAuth2 access tokens expire after 1 hour and are refreshed silently. Tokens are held only in `chrome.storage.session` (in-memory, cleared when the browser exits) and are revoked when you remove an account. Only account emails are persisted to `chrome.storage.local`.
 - **Extension isolation** — Chrome enforces strict storage isolation between extensions. No other extension or webpage can access your stored tokens.
 - **No background activity** — The extension only scans Gmail when you open the popup. There is no persistent background polling or data collection.
 - **Open source** — All code is in this repo. There is no minified or obfuscated code.
 
-See the full [Privacy Policy](privacy-policy.md).
+See the full [Privacy Policy](privacy-policy/index.html).
 
 ## Other Chromium browsers
 
 The extension works in any Chromium-based browser (Arc, Brave, Edge, etc.). Each browser assigns a different extension ID, so you'll need to add the browser-specific redirect URI to your OAuth client's Authorized redirect URIs in Google Cloud Console.
+
+## Development
+
+```bash
+node --test
+```
+
+The extension can be loaded without an npm build.
 
 ## Icons
 
